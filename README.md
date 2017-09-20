@@ -8,10 +8,12 @@ This is the first and only *individual* (as opposed to *team*) this semester.
 
 Term: Fall 2017
 
-+ Projec title: Lorem ipsum dolor sit amet
-+ This project is conducted by [your name]
++ Projec title: The similar words and different sentiment changes of Presidents inaugural speech
++ This project is conducted by [Shuyao Hao]
 
-+ Project summary: [a short summary] Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
++ Project summary: This project used mining text model and sentiment analysis to find similarities and differences sentiment over six latest presidents. The top 10 common words of each president are founded to show the main topics of them. Further, I calculated the frequency for each word across the entire six president speeches versus within each one
+of them. This will allow us to compare strong deviations of word frequency within each speech as compared
+to across the entire version. Finally, conducted the sentiment analysis to see the emotional changes of each president.
 
 Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
 
