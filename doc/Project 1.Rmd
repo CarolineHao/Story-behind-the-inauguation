@@ -1,0 +1,255 @@
+---
+title: "Project 1. Presidents' Inaugural Speeches"
+author: "Caroline Hao"
+date: "9/18/2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Step1. Preparation: Install needed Packages and load the libraries
+
+```{r setup, include=FALSE}
+packages.used=c("tm", "wordcloud", "RColorBrewer", 
+                "dplyr", "tidytext", "tidyverse", "stringr","rvest", "tibble", 
+                "sentimentr", "gplots", "dplyr",
+                "tm", "syuzhet", "factoextra", 
+                "beeswarm", "scales", "RColorBrewer",
+                "RANN", "tm")
+
+# check packages that need to be installed.
+packages.needed=setdiff(packages.used, 
+                        intersect(installed.packages()[,1], 
+                                  packages.used))
+# install additional packages
+if(length(packages.needed)>0){
+  install.packages(packages.needed, dependencies = TRUE,
+                   repos='http://cran.us.r-project.org')
+}
+
+# install package for Sentiment Analysis
+if (packageVersion("devtools") < 1.6) {
+  install.packages("devtools")
+}
+
+library(tm)
+library(wordcloud)
+library(RColorBrewer)
+library(dplyr)
+library(tidytext)       
+library(tidyverse)      
+library(stringr)
+library(rvest)
+library(tibble)
+library(sentimentr)
+library(gplots)
+library(dplyr)
+library(tm)
+library(syuzhet)
+library(factoextra)
+library(beeswarm)
+library(scales)
+library(RColorBrewer)
+library(RANN)
+library(tm)
+
+
+source("~/Desktop/lib/plotstacked.R")
+source("~/Desktop/lib/speechFuncs.R")
+
+```
+
+# Step2. Data: Read the speach and convert to the tidy data
+
+Readed all the speeches and convert all the data into a tidy format for future sentiment analysis. 
+
+```{r}
+#Loaded inauguaral speeches from the following website
+main.page <- read_html(x = "http://www.presidency.ucsb.edu/inaugurals.php")
+inaug <- f.speechlinks(main.page)
+inaug <- inaug[-nrow(inaug),]  # remove the last line, irrelevant due to error.
+as.Date(inaug[,1], format="%B %d, %Y")
+nrow(inaug)
+#58
+
+# Loaded nomination speeches from the following website
+main.page=read_html("http://www.presidency.ucsb.edu/nomination.php")
+nomin <- f.speechlinks(main.page)
+nomin <- nomin[-47,]   #Delete the nomin of Calvin Coolidge
+nrow(nomin)
+#54
+
+#Loaded farewell speeches from the following website
+main.page=read_html("http://www.presidency.ucsb.edu/farewell_addresses.php")
+farewell <- f.speechlinks(main.page)
+nrow(farewell)
+#13
+
+#Readed the overall information
+inaug.list=read.csv("~/Desktop/data/inauglist.csv", stringsAsFactors = FALSE)
+nrow(inaug.list)
+nomin.list=read.csv("~/Desktop/data/nominlist.csv", stringsAsFactors = FALSE)
+nrow(nomin.list)
+farewell.list=read.csv("~/Desktop/data/farewelllist.csv", stringsAsFactors = FALSE)
+nrow(farewell.list)
+
+
+#Combined all relevant information together
+speech.list=rbind(inaug.list, nomin.list, farewell.list)
+speech.list$type=c(rep("inaug", nrow(inaug.list)),
+                   rep("nomin", nrow(nomin.list)),
+                   rep("farewell", nrow(farewell.list)))
+length(speech.list$type)
+speech.url=rbind(inaug, nomin, farewell)
+speech.list=cbind(speech.list, speech.url)
+
+speech.list$fulltext=NA
+for(i in seq(nrow(speech.list))) {
+  text <- read_html(speech.list$urls[i]) %>% 
+    html_nodes(".displaytext") %>% 
+    html_text() # get the text
+  speech.list$fulltext[i]=text
+  filename <- paste0("~/Desktop/data/fulltext/", 
+                     speech.list$type[i],
+                     speech.list$File[i], "-", 
+                     speech.list$Term[i], ".txt")
+  sink(file = filename) %>% 
+  cat(text)  
+  sink() 
+}
+
+
+# Converted into the tidy format
+Speeches_text <- speech.list$fulltext
+Presidents_Name <- speech.list $ President
+
+series <- tibble()
+for(i in seq_along(Presidents_Name)) {
+        
+        clean <- tibble(Term = seq_along(Speeches_text[[i]]),
+                        text = Speeches_text[[i]]) %>%
+             unnest_tokens(word, text) %>%
+             mutate(Name = Presidents_Name[i]) %>%
+             select(Name, everything())
+
+        series <- rbind(series, clean)
+}
+
+
+series
+
+
+```
+
+# Step3. Word frequency: Most frequent Words in latest six presidents
+
+Now we want to get a version of the common words in each of the speech as well as the entire speeches of six presidents. 
+
+Step1. We remove the stop words (i.e. the, and, to, of, a, he, …) and start to find the top 10 frequent words in each president speech
+
+Step2. Plot these words grouped by eah president
+
+Step3. Calculate the frequency for each word across the entire six president speeches versus within each one of them. This will allow us to compare strong deviations of word frequency within each speech as compared to across the entire version.
+
+Step4. Plot the graph of them
+
+```{r}
+
+# Find the top 10 most frequent words of the last six presidents
+series %>%
+        anti_join(stop_words) %>%
+        group_by(Name) %>%
+        count(word, sort = TRUE) %>%
+        top_n(10)
+
+Last_six = c("Donald J. Trump", "Barack Obama", "George W. Bush", "William J. Clinton", "George Bush", "Ronald Reagan")
+
+series %>%
+        anti_join(stop_words) %>%
+        group_by(Name) %>%
+        count(word, sort = TRUE) %>%
+        top_n(10) %>%
+        ungroup() %>%
+        mutate(Name = factor(Name, levels = Last_six),
+               text_order = nrow(.):1) %>%
+        ggplot(aes(reorder(word, text_order), n, fill = Name)) +
+          geom_bar(stat = "identity") +
+          ylim(0,200) +
+          facet_wrap(~ Name, scales = "free_y") +
+          labs(x = "Word", y = "Frequency") +
+          coord_flip() +
+          theme(legend.position="none")
+
+
+Word_propotion <- series %>%
+        anti_join(stop_words) %>%
+        count(word) %>%
+        transmute(word, all_words = n / sum(n))
+
+# calculate percent of word use within each speech
+frequency <- series %>%
+        anti_join(stop_words) %>%
+        count(Name, word) %>%
+        mutate(Pres_words = n / sum(n)) %>%
+        left_join(Word_propotion) %>%
+        arrange(desc(Pres_words)) %>%
+        ungroup()
+        
+Sub <- frequency[frequency$Name == Last_six, ]
+
+ggplot(Sub, aes(x = Pres_words, y = all_words, color = abs(all_words - Pres_words))) +
+        geom_abline(color = "gray40", lty = 2) +
+        geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+        geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+        scale_x_log10(labels = scales::percent_format()) +
+        scale_y_log10(labels = scales::percent_format()) +
+        scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+        facet_wrap(~ Name, ncol = 2) +
+        theme(legend.position="none") +
+        labs(y = "The word frequency in Presidents' inaugural", x = "Propotion")
+
+```
+
+Words are close to the line such as "crucial", "americas", in these plots have similar frequencies across all the novels.
+
+Words that are far from the line are words that are found more in one text than another. Furthermore, words standing out above the line are common across the entire speeches but not within a specfic one; whereas words below the line are common in that specific speech but not in all the speeches.
+
+For example, “Freedom” stands out above the line in the Donald J. Trump. This means that “Freedom” is fairly common across the entire speeches but is not used as much in Trump's inaugural speech.
+
+
+# Step3. Sentiment Analysis: Sentiment changes of latest six presidents 
+
+The tidytext package contains three sentiment lexicons in the sentiments dataset. Here we will use "bing" which categorizes words in a binary fashion into positive and negative categories.
+
+Step1. We break up each speech by 50 words
+
+Step2. Used "bing" to assess the positive vs. negative sentiment of each word
+
+Step3. Counted up how many positive and negative words there are for every 50 words
+
+Step4. Calculated a net sentiment using (positive words - negative words)
+
+Step5. Plotted the final results
+
+```{r}
+# Loaded lexicon
+get_sentiments("bing")
+
+
+series %>%
+        group_by(Name) %>% 
+        mutate(word_count = 1:n(),
+               index = word_count %/% 50 + 1) %>% 
+        inner_join(get_sentiments("bing")) %>%
+        count(Name, index = index , sentiment) %>%
+        ungroup() %>%
+        spread(sentiment, n, fill = 0) %>%
+        mutate(sentiment = positive - negative,
+               Name = factor(Name, levels = Last_six)) %>%
+        ggplot(aes(index, sentiment, fill = Name)) +
+          ylim(-8,8) +
+          geom_bar(alpha = 0.5, stat = "identity", show.legend = FALSE) +
+          facet_wrap(~ Name, ncol = 2, scales = "free_x")
+```
+
+From above plots we can see that all the speeched move more positive than nagetive and Trump seemed to have a highest propotion of negative words. Also we can see clearly how the emotion of each president changed over their inaugural speach.
